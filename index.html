@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>台股融資融券維持率監控</title>
 <style>
 :root{
@@ -156,7 +159,9 @@ footer b{color:var(--ink2)}
   </footer>
 </div>
 
-<script src="data.js"></script>
+<script>
+document.write('<script src="data.js?v=' + Date.now() + '"><\/script>');
+</script>
 <script>
 const D = window.MARGIN_DATA;
 const TH_DANGER = 130, TH_WARN = 140;
