@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台股融資融券維持率監控</title>
+<style>
+:root{
+  --bg:#0d1117; --surface:#161b22; --surface2:#1c2230; --border:#2a3140;
+  --ink:#e6edf3; --ink2:#9aa7b8; --ink3:#6b7688;
+  --good:#3fb27f; --warn:#e8a33d; --danger:#f2545b;
+  --warn-bg:rgba(232,163,61,.12); --danger-bg:rgba(242,84,91,.14);
+  --up:#f2545b; --down:#3fb27f; /* 台股紅漲綠跌 */
+  --accent:#5b9dd9;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:"Segoe UI","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;font-size:14px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+
+/* ── header ── */
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:6px}
+header h1{font-size:22px;font-weight:700;letter-spacing:.5px}
+.date-chip{color:var(--ink2);font-size:13px}
+.sub{color:var(--ink3);font-size:12.5px;margin-bottom:18px}
+
+/* ── market cards ── */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+.card .mkt-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.card .mkt-name{font-size:16px;font-weight:700}
+.card .mkt-code{color:var(--ink3);font-size:12px}
+.card .idx{font-size:15px;font-variant-numeric:tabular-nums}
+.card .idx .chg{margin-left:6px;font-size:13px}
+.ratio-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.ratio{background:var(--surface2);border-radius:10px;padding:10px 12px;position:relative}
+.ratio .lbl{font-size:12px;color:var(--ink2);margin-bottom:2px}
+.ratio .val{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.3px}
+.ratio .unit{font-size:13px;color:var(--ink2);margin-left:1px}
+.card .meta{margin-top:12px;color:var(--ink3);font-size:12px;display:flex;gap:16px;flex-wrap:wrap}
+
+/* 狀態色 */
+.s-good{color:var(--ink)}
+.s-warn{color:var(--warn)}
+.s-danger{color:var(--danger)}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;margin-top:6px;white-space:nowrap}
+.badge.warn{background:var(--warn-bg);color:var(--warn)}
+.badge.danger{background:var(--danger-bg);color:var(--danger)}
+.blink{animation:blink 1.1s step-end infinite}
+@keyframes blink{50%{opacity:.25}}
+@media (prefers-reduced-motion: reduce){.blink{animation:none}}
+
+/* ── alert summary ── */
+.alert-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.alert-chip{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-size:13px;color:var(--ink2)}
+.alert-chip b{font-variant-numeric:tabular-nums}
+.alert-chip.danger{border-color:rgba(242,84,91,.45)}
+.alert-chip.danger b{color:var(--danger)}
+.alert-chip.warn b{color:var(--warn)}
+
+/* ── controls ── */
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.controls input[type=text]{background:var(--surface);border:1px solid var(--border);color:var(--ink);border-radius:8px;padding:8px 12px;font-size:14px;width:220px;outline:none}
+.controls input[type=text]:focus{border-color:var(--accent)}
+.seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg button{background:var(--surface);border:none;color:var(--ink2);padding:8px 14px;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--surface2);color:var(--ink);font-weight:700}
+.chk{display:flex;align-items:center;gap:6px;color:var(--ink2);font-size:13px;cursor:pointer;user-select:none}
+.chk input{accent-color:var(--danger)}
+.legend{margin-left:auto;display:flex;gap:14px;font-size:12px;color:var(--ink3);flex-wrap:wrap}
+.legend .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:middle}
+
+/* ── table ── */
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:900px}
+th{position:sticky;top:0;background:var(--surface2);color:var(--ink2);font-size:12px;font-weight:600;text-align:right;padding:10px 12px;white-space:nowrap;cursor:pointer;user-select:none;z-index:1}
+th.l{text-align:left}
+th .arr{color:var(--accent);margin-left:2px}
+td{padding:8px 12px;text-align:right;font-variant-numeric:tabular-nums;border-top:1px solid var(--border);white-space:nowrap}
+td.l{text-align:left}
+tr:hover td{background:rgba(91,157,217,.06)}
+.nm{font-weight:600}
+.code{color:var(--ink3);font-size:12px;margin-left:6px}
+.mtag{font-size:11px;color:var(--ink3);border:1px solid var(--border);border-radius:4px;padding:0 5px;margin-left:6px}
+.chg-up{color:var(--up)} .chg-down{color:var(--down)} .chg-flat{color:var(--ink3)}
+td .w-ic{font-size:11px;margin-left:4px}
+.cell-warn{color:var(--warn);font-weight:700}
+.cell-danger{color:var(--danger);font-weight:700}
+.dim{color:var(--ink3)}
+.more{display:block;width:100%;background:var(--surface2);border:none;color:var(--accent);padding:12px;font-size:14px;cursor:pointer;border-top:1px solid var(--border)}
+.more:hover{background:#232b3d}
+.count-note{color:var(--ink3);font-size:12px;margin:8px 2px}
+
+/* ── footer ── */
+footer{margin-top:26px;color:var(--ink3);font-size:12px;line-height:1.8;border-top:1px solid var(--border);padding-top:14px}
+footer b{color:var(--ink2)}
+@media (max-width:640px){
+  .ratio .val{font-size:21px}
+  .legend{margin-left:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>台股融資融券維持率監控</h1>
+    <span class="date-chip" id="dataDate"></span>
+  </header>
+  <div class="sub">每日盤後信用交易資料｜追繳警戒線 130%</div>
+
+  <div class="cards" id="cards"></div>
+  <div class="alert-bar" id="alertBar"></div>
+
+  <div class="controls">
+    <input type="text" id="q" placeholder="搜尋代號或名稱…">
+    <div class="seg" id="mktSeg">
+      <button data-m="" class="on">全部</button>
+      <button data-m="上市">上市</button>
+      <button data-m="上櫃">上櫃</button>
+    </div>
+    <label class="chk"><input type="checkbox" id="onlyAlert">只看警示</label>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--danger)"></span>低於 130%（追繳線）</span>
+      <span><span class="dot" style="background:var(--warn)"></span>130–140%（接近追繳）</span>
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th class="l" style="width:36px">#</th>
+          <th class="l" data-k="name">個股</th>
+          <th data-k="close">收盤價</th>
+          <th data-k="chg">漲跌</th>
+          <th data-k="cap">市值(億)</th>
+          <th data-k="finRatio">融資維持率</th>
+          <th data-k="shortRatio">融券維持率</th>
+          <th data-k="overall">整體維持率</th>
+          <th data-k="finBal">資餘(張)</th>
+          <th data-k="finChg">資增減</th>
+          <th data-k="sr">券資比%</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <button class="more" id="moreBtn">載入更多</button>
+  </div>
+  <div class="count-note" id="countNote"></div>
+
+  <footer>
+    <b>資料說明</b>：維持率三欄取自每日盤後「日融資券排行」之融資維持率(%)、融券維持率(%)、整體維持率(%)；
+    加權指數／OTC 指數卡片為同報表之 TWA00、TWC00 大盤合計值。
+    收盤價、漲跌、市值、資券餘額與券資比由資料庫同日資料補充。<br>
+    <b>注意</b>：維持率為推估口徑（依公告成數與推估成本計算），與券商實際帳戶維持率、證交所公告之實戶口徑會有差異。
+    數值僅供研究參考，非投資建議。
+  </footer>
+</div>
+
+<script src="data.js"></script>
+<script>
+const D = window.MARGIN_DATA;
+const TH_DANGER = 130, TH_WARN = 140;
+
+function cls(v){ if(v==null) return ''; if(v<TH_DANGER) return 'danger'; if(v<TH_WARN) return 'warn'; return 'good'; }
+function fmtDate(s){ return s.slice(0,4)+'/'+s.slice(4,6)+'/'+s.slice(6,8); }
+function fmt(n,d=1){ return n==null ? '–' : n.toLocaleString('zh-TW',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fmtInt(n){ return n==null ? '–' : n.toLocaleString('zh-TW'); }
+
+document.getElementById('dataDate').textContent = '資料日期 ' + fmtDate(D.date);
+
+/* ── market cards ── */
+const MKT_META = { TWA00:{name:'加權指數', tag:'上市 TWA00'}, TWC00:{name:'OTC 櫃買指數', tag:'上櫃 TWC00'} };
+const cardsEl = document.getElementById('cards');
+for(const key of ['TWA00','TWC00']){
+  const m = D.market[key], meta = MKT_META[key];
+  const chgCls = m.indexChg>0?'chg-up':(m.indexChg<0?'chg-down':'chg-flat');
+  const ratios = [
+    ['融資維持率', m.finRatio],
+    ['融券維持率', m.shortRatio],
+    ['整體維持率', m.overall],
+  ].map(([lbl,v])=>{
+    const c = cls(v);
+    const badge = c==='danger' ? '<span class="badge danger blink">⚠ 低於追繳線</span>'
+               : c==='warn'   ? '<span class="badge warn blink">⚠ 接近追繳</span>' : '';
+    return `<div class="ratio"><div class="lbl">${lbl}</div>
+      <div class="val s-${c}">${fmt(v)}<span class="unit">%</span></div>${badge}</div>`;
+  }).join('');
+  cardsEl.insertAdjacentHTML('beforeend', `
+    <div class="card">
+      <div class="mkt-head">
+        <span class="mkt-name">${meta.name}</span><span class="mkt-code">${meta.tag}</span>
+        <span class="idx">${fmt(m.index,2)}<span class="chg ${chgCls}">${m.indexChg>0?'▲':(m.indexChg<0?'▼':'')} ${fmt(Math.abs(m.indexChg),2)}</span></span>
+      </div>
+      <div class="ratio-row">${ratios}</div>
+      <div class="meta"><span>信用交易檔數 ${m.n.toLocaleString()}</span>${m.finBalValue?`<span>融資餘額約 ${fmtInt(m.finBalValue)} 億</span>`:''}</div>
+    </div>`);
+}
+
+/* ── alert summary ── */
+const nDanger = D.stocks.filter(s=>s.finRatio!=null && s.finRatio<TH_DANGER).length;
+const nWarn   = D.stocks.filter(s=>s.finRatio!=null && s.finRatio>=TH_DANGER && s.finRatio<TH_WARN).length;
+document.getElementById('alertBar').innerHTML = `
+  <div class="alert-chip danger">融資維持率跌破 130%：<b>${nDanger}</b> 檔</div>
+  <div class="alert-chip warn">130–140% 接近追繳：<b>${nWarn}</b> 檔</div>
+  <div class="alert-chip">有信用交易餘額個股：<b>${D.stocks.length.toLocaleString()}</b> 檔</div>`;
+
+/* ── table state ── */
+let state = { q:'', mkt:'', onlyAlert:false, sortK:'cap', sortDir:-1, shown:100 };
+
+function isAlert(s){
+  return [s.finRatio,s.shortRatio,s.overall].some(v=>v!=null && v<TH_WARN);
+}
+function filtered(){
+  let rows = D.stocks;
+  if(state.mkt) rows = rows.filter(s=>s.mkt===state.mkt);
+  if(state.onlyAlert) rows = rows.filter(isAlert);
+  if(state.q){
+    const q = state.q.toLowerCase();
+    rows = rows.filter(s=>s.id.includes(q)||s.name.toLowerCase().includes(q));
+  }
+  const k = state.sortK, dir = state.sortDir;
+  rows = [...rows].sort((a,b)=>{
+    let x=a[k], y=b[k];
+    if(k==='name'){ x=a.id; y=b.id; return dir*(x<y?-1:x>y?1:0); }
+    if(x==null) return 1; if(y==null) return -1;
+    return dir*(x-y);
+  });
+  return rows;
+}
+
+function ratioCell(v){
+  if(v==null) return '<td class="dim">–</td>';
+  const c = cls(v);
+  if(c==='danger') return `<td class="cell-danger blink">${fmt(v)}<span class="w-ic">⚠</span></td>`;
+  if(c==='warn')   return `<td class="cell-warn">${fmt(v)}<span class="w-ic">⚠</span></td>`;
+  return `<td>${fmt(v)}</td>`;
+}
+
+function render(){
+  const rows = filtered();
+  const slice = rows.slice(0, state.shown);
+  const html = slice.map((s,i)=>{
+    const chgCls = s.chg>0?'chg-up':(s.chg<0?'chg-down':'chg-flat');
+    return `<tr>
+      <td class="l dim">${i+1}</td>
+      <td class="l"><span class="nm">${s.name}</span><span class="code">${s.id}</span><span class="mtag">${s.mkt}</span></td>
+      <td>${fmt(s.close,2)}</td>
+      <td class="${chgCls}">${s.chg==null?'–':(s.chg>0?'+':'')+fmt(s.chg,2)}</td>
+      <td>${fmt(s.cap,0)}</td>
+      ${ratioCell(s.finRatio)}
+      ${ratioCell(s.shortRatio)}
+      ${ratioCell(s.overall)}
+      <td>${fmtInt(s.finBal)}</td>
+      <td class="${s.finChg>0?'chg-up':(s.finChg<0?'chg-down':'dim')}">${s.finChg>0?'+':''}${fmtInt(s.finChg)}</td>
+      <td>${fmt(s.sr,1)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tbody').innerHTML = html;
+  document.getElementById('moreBtn').style.display = rows.length>state.shown ? 'block':'none';
+  document.getElementById('countNote').textContent = `顯示 ${Math.min(state.shown,rows.length).toLocaleString()} / ${rows.length.toLocaleString()} 檔`;
+  document.querySelectorAll('th[data-k]').forEach(th=>{
+    const base = th.textContent.replace(/[▲▼]\s*$/,'').trim();
+    th.innerHTML = base + (th.dataset.k===state.sortK ? `<span class="arr">${state.sortDir<0?'▼':'▲'}</span>`:'');
+  });
+}
+
+document.getElementById('q').addEventListener('input', e=>{ state.q=e.target.value.trim(); state.shown=100; render(); });
+document.getElementById('onlyAlert').addEventListener('change', e=>{ state.onlyAlert=e.target.checked; state.shown=100; render(); });
+document.getElementById('mktSeg').addEventListener('click', e=>{
+  if(e.target.tagName!=='BUTTON') return;
+  document.querySelectorAll('#mktSeg button').forEach(b=>b.classList.remove('on'));
+  e.target.classList.add('on');
+  state.mkt = e.target.dataset.m; state.shown=100; render();
+});
+document.getElementById('moreBtn').addEventListener('click', ()=>{ state.shown+=200; render(); });
+document.querySelectorAll('th[data-k]').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const k = th.dataset.k;
+    if(state.sortK===k) state.sortDir*=-1;
+    else { state.sortK=k; state.sortDir = k==='name'?1:-1; }
+    state.shown=100; render();
+  });
+});
+render();
+</script>
+</body>
+</html>
