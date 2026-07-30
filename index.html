@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>台股融資融券維持率監控</title>
+<title>台股融資融券風險指標監控</title>
 <style>
 :root{
   --bg:#0d1117; --surface:#161b22; --surface2:#1c2230; --border:#2a3140;
@@ -105,7 +105,7 @@ footer b{color:var(--ink2)}
 <body>
 <div class="wrap">
   <header>
-    <h1>台股融資融券維持率監控</h1>
+    <h1>台股融資融券風險指標監控</h1>
     <span class="date-chip" id="dataDate"></span>
   </header>
   <div class="sub">每日盤後信用交易資料｜追繳警戒線 130%</div>
@@ -136,9 +136,9 @@ footer b{color:var(--ink2)}
           <th data-k="close">收盤價</th>
           <th data-k="chg">漲跌</th>
           <th data-k="cap">市值(億)</th>
-          <th data-k="finRatio">融資維持率</th>
-          <th data-k="shortRatio">融券維持率</th>
-          <th data-k="overall">整體維持率</th>
+          <th data-k="finRatio">融資風險指標</th>
+          <th data-k="shortRatio">融券風險指標</th>
+          <th data-k="overall">整體風險指標</th>
           <th data-k="finBal">資餘(張)</th>
           <th data-k="finChg">資增減</th>
           <th data-k="sr">券資比%</th>
@@ -151,10 +151,10 @@ footer b{color:var(--ink2)}
   <div class="count-note" id="countNote"></div>
 
   <footer>
-    <b>資料說明</b>：維持率三欄取自每日盤後「日融資券排行」之融資維持率(%)、融券維持率(%)、整體維持率(%)；
+    <b>資料說明</b>：融資／融券／整體三項風險指標為每日盤後依信用交易資料推估計算；
     加權指數／OTC 指數卡片為上市、上櫃全市場大盤合計值。
     收盤價、漲跌、市值、資券餘額與券資比由資料庫同日資料補充。<br>
-    <b>注意</b>：維持率為推估口徑（依公告成數與推估成本計算），與券商實際帳戶維持率、證交所公告之實戶口徑會有差異。
+    <b>注意</b>：風險指標為推估口徑（依公告成數與推估成本計算），與券商實際帳戶數值、交易所公告之實戶口徑會有差異。
     數值僅供研究參考，非投資建議。
   </footer>
 </div>
@@ -181,9 +181,9 @@ for(const key of ['TSE','OTC']){
   const m = D.market[key], meta = MKT_META[key];
   const chgCls = m.indexChg>0?'chg-up':(m.indexChg<0?'chg-down':'chg-flat');
   const ratios = [
-    ['融資維持率', m.finRatio],
-    ['融券維持率', m.shortRatio],
-    ['整體維持率', m.overall],
+    ['融資風險指標', m.finRatio],
+    ['融券風險指標', m.shortRatio],
+    ['整體風險指標', m.overall],
   ].map(([lbl,v])=>{
     const c = cls(v);
     const badge = c==='danger' ? '<span class="badge danger blink">⚠ 低於追繳線</span>'
@@ -206,7 +206,7 @@ for(const key of ['TSE','OTC']){
 const nDanger = D.stocks.filter(s=>s.finRatio!=null && s.finRatio<TH_DANGER).length;
 const nWarn   = D.stocks.filter(s=>s.finRatio!=null && s.finRatio>=TH_DANGER && s.finRatio<TH_WARN).length;
 document.getElementById('alertBar').innerHTML = `
-  <div class="alert-chip danger">融資維持率跌破 130%：<b>${nDanger}</b> 檔</div>
+  <div class="alert-chip danger">融資風險指標跌破 130%：<b>${nDanger}</b> 檔</div>
   <div class="alert-chip warn">130–140% 接近追繳：<b>${nWarn}</b> 檔</div>
   <div class="alert-chip">有信用交易餘額個股：<b>${D.stocks.length.toLocaleString()}</b> 檔</div>`;
 
