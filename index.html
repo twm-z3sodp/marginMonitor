@@ -166,7 +166,8 @@ function fmtDate(s){ return s.slice(0,4)+'/'+s.slice(4,6)+'/'+s.slice(6,8); }
 function fmt(n,d=1){ return n==null ? '–' : n.toLocaleString('zh-TW',{minimumFractionDigits:d,maximumFractionDigits:d}); }
 function fmtInt(n){ return n==null ? '–' : n.toLocaleString('zh-TW'); }
 
-document.getElementById('dataDate').textContent = '資料日期 ' + fmtDate(D.date);
+document.getElementById('dataDate').textContent = '資料日期 ' + fmtDate(D.date)
+  + (D.generated ? '｜' + D.generated.slice(11,16) + ' 更新' : '');
 
 /* ── market cards ── */
 const MKT_META = { TSE:{name:'加權指數', tag:'上市'}, OTC:{name:'OTC 櫃買指數', tag:'上櫃'} };
