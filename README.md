@@ -2,4 +2,4 @@
 
 每日盤後信用交易維持率儀表板。
 
-https://cmoneyjoseph.github.io/marginMonitor/
+https://twm-z3sodp.github.io/marginMonitor/
