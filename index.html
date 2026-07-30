@@ -149,7 +149,7 @@ footer b{color:var(--ink2)}
 
   <footer>
     <b>資料說明</b>：維持率三欄取自每日盤後「日融資券排行」之融資維持率(%)、融券維持率(%)、整體維持率(%)；
-    加權指數／OTC 指數卡片為同報表之 TWA00、TWC00 大盤合計值。
+    加權指數／OTC 指數卡片為上市、上櫃全市場大盤合計值。
     收盤價、漲跌、市值、資券餘額與券資比由資料庫同日資料補充。<br>
     <b>注意</b>：維持率為推估口徑（依公告成數與推估成本計算），與券商實際帳戶維持率、證交所公告之實戶口徑會有差異。
     數值僅供研究參考，非投資建議。
@@ -169,9 +169,9 @@ function fmtInt(n){ return n==null ? '–' : n.toLocaleString('zh-TW'); }
 document.getElementById('dataDate').textContent = '資料日期 ' + fmtDate(D.date);
 
 /* ── market cards ── */
-const MKT_META = { TWA00:{name:'加權指數', tag:'上市 TWA00'}, TWC00:{name:'OTC 櫃買指數', tag:'上櫃 TWC00'} };
+const MKT_META = { TSE:{name:'加權指數', tag:'上市'}, OTC:{name:'OTC 櫃買指數', tag:'上櫃'} };
 const cardsEl = document.getElementById('cards');
-for(const key of ['TWA00','TWC00']){
+for(const key of ['TSE','OTC']){
   const m = D.market[key], meta = MKT_META[key];
   const chgCls = m.indexChg>0?'chg-up':(m.indexChg<0?'chg-down':'chg-flat');
   const ratios = [
