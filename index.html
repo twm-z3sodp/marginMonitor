@@ -106,6 +106,29 @@ footer b{color:var(--ink2)}
 .mini.good{color:var(--good)}
 .mini.flat{color:var(--ink3)}
 
+/* ── 斷頭壓力儀表 ── */
+#breadthWrap{margin-bottom:14px}
+.bd-grid{display:flex;gap:22px;flex-wrap:wrap;align-items:stretch}
+.bd-left{flex:1 1 280px;min-width:260px}
+.bd-spark{flex:1 1 320px;min-width:260px;display:flex;flex-direction:column;justify-content:flex-end}
+.bd-big{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.bd-big .unit{font-size:16px;color:var(--ink2)}
+.bd-cnt{color:var(--ink3);font-size:12px;margin-left:8px}
+.bd-row{margin-top:8px;font-size:13px;color:var(--ink2)}
+.bd-row b{color:var(--ink);font-variant-numeric:tabular-nums}
+.zone-badge{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;border-radius:7px;padding:3px 10px;margin-top:10px}
+.zone-badge.danger{background:var(--danger-bg);color:var(--danger)}
+.zone-badge.warn{background:var(--warn-bg);color:var(--warn)}
+.zone-badge.good{background:rgba(63,178,127,.12);color:var(--good)}
+.gauge{position:relative;display:flex;height:10px;border-radius:5px;overflow:visible;margin:16px 0 4px}
+.gauge div{height:100%}
+.gauge .g1{background:#2e4a3c;width:25%;border-radius:5px 0 0 5px}
+.gauge .g2{background:#5c4a22;width:25%}
+.gauge .g3{background:#5e2a2e;width:25%}
+.gauge .g4{background:#7a2229;width:25%;border-radius:0 5px 5px 0}
+.gauge .gm{position:absolute;top:-7px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid var(--ink);transform:translateX(-6px)}
+.gauge-lab{display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-bottom:2px}
+
 /* ── 走勢圖 ── */
 .chart-box{position:relative}
 .chart-box svg{display:block;width:100%;height:auto}
@@ -143,6 +166,7 @@ footer b{color:var(--ink2)}
   <div class="sub">每日盤後信用交易資料｜追繳警戒線 130%</div>
 
   <div class="cards" id="cards"></div>
+  <div id="breadthWrap"></div>
   <div class="cards" id="trendCards"></div>
   <div class="alert-bar" id="alertBar"></div>
 
@@ -195,6 +219,7 @@ footer b{color:var(--ink2)}
 <script>
 document.write('<script src="data.js?v=' + Date.now() + '"><\/script>');
 document.write('<script src="history.js?v=' + Date.now() + '"><\/script>');
+document.write('<script src="breadth.js?v=' + Date.now() + '"><\/script>');
 </script>
 <script>
 const D = window.MARGIN_DATA;
@@ -252,6 +277,87 @@ document.getElementById('alertBar').innerHTML = `
   <div class="alert-chip danger">融資風險指標跌破 130%：<b>${nDanger}</b> 檔</div>
   <div class="alert-chip warn">130–140% 接近追繳：<b>${nWarn}</b> 檔</div>
   <div class="alert-chip">有信用交易餘額個股：<b>${D.stocks.length.toLocaleString()}</b> 檔</div>`;
+
+/* ── 斷頭壓力儀表（破線比例＋所在位階） ── */
+(function(){
+  const B = window.BREADTH_DATA;
+  if(!B || !B.series || B.series.length < 10) return;
+  const s = B.series, nl = s.length - 1;
+  const cur = s[nl].pct, prev = s[nl-1].pct;
+  const d1 = cur - prev;
+  const d5 = cur - (s[Math.max(0, nl-5)].pct);
+  const nDang = D.stocks.filter(x=>x.finRatio!=null && x.finRatio<130).length;
+  const nCred = D.stocks.filter(x=>x.finRatio!=null).length;
+  // 制度後歷史百分位（格點內插，B.ref = p0,p5,...,p100）
+  const g = B.ref;
+  let pr = 100;
+  if(cur <= g[0]) pr = 0;
+  else { for(let i=0;i<g.length-1;i++){ if(cur < g[i+1]){ pr = (i + (cur-g[i])/Math.max(g[i+1]-g[i],1e-9))*5; break; } } }
+  pr = Math.min(100, Math.max(0, pr));
+  // 本波（自最後一次 <10% 起）峰值與回落
+  let ws = 0;
+  for(let i=nl;i>=0;i--){ if(s[i].pct < 10){ ws = i; break; } }
+  const wave = s.slice(ws);
+  const wavePeak = Math.max(...wave.map(p=>p.pct));
+  const pullback = wavePeak - cur;
+  const wave20 = wave.some(p=>p.pct >= 20);
+  const hs = (window.MARGIN_HISTORY && window.MARGIN_HISTORY.series && window.MARGIN_HISTORY.series.TSE) || [];
+  const idx5 = hs.length > 5 ? (hs[hs.length-1].close/hs[hs.length-6].close - 1)*100 : null;
+  // 狀態分級（依歷史研究：<10低壓/10-20壓力升高/>=20危機警報/>=30極端投降區）
+  let zone, zcls, blink='';
+  if(cur >= 30){ zone='極端投降區'; zcls='danger'; blink=' blink'; }
+  else if(cur >= 20){ zone = d5>=5 ? '危機警報・加速中' : '危機警報'; zcls='danger'; blink=' blink'; }
+  else if(cur >= 10){ zone='壓力升高'; zcls='warn'; }
+  else { zone='低壓'; zcls='good'; }
+  const reversal = wave20 && pullback >= 5 && idx5 != null && idx5 > 0;
+  const dchip = d1 > 0 ? `<span class="diff bad" style="margin-left:10px">▲ 較昨日 +${d1.toFixed(1)}pp（惡化）</span>`
+             : d1 < 0 ? `<span class="diff good" style="margin-left:10px">▼ 較昨日 ${d1.toFixed(1)}pp（改善）</span>`
+             : `<span class="diff flat" style="margin-left:10px">— 與昨日持平</span>`;
+  // 迷你走勢（180日）
+  const W=640, H=120, PL=34, PR=8, PT=6, PB=18;
+  const hi = Math.max(35, Math.ceil(Math.max(...s.map(p=>p.pct))/5)*5);
+  const xs = i => PL + i*(W-PL-PR)/(s.length-1);
+  const yy = v => PT + (H-PT-PB) * (1 - v/hi);
+  const path = s.map((p,i)=>(i?'L':'M')+xs(i).toFixed(1)+','+yy(p.pct).toFixed(1)).join('');
+  const ticks = [10,20,30].filter(v=>v<hi).map(v=>{
+    const col = v===10?'var(--warn)':'var(--danger)';
+    return `<line x1="${PL}" x2="${W-PR}" y1="${yy(v).toFixed(1)}" y2="${yy(v).toFixed(1)}" stroke="${col}" stroke-dasharray="3 4" stroke-width="1" opacity=".7"/>
+            <text x="${PL-5}" y="${(yy(v)+3.5).toFixed(1)}" fill="#6b7688" font-size="10" text-anchor="end">${v}</text>`;
+  }).join('');
+  const xdates = [0, Math.floor(s.length/2), s.length-1].map(i=>{
+    const d = s[i].d;
+    const anch = i===0?'start':(i===s.length-1?'end':'middle');
+    return `<text x="${xs(i).toFixed(1)}" y="${H-4}" fill="#6b7688" font-size="10" text-anchor="${anch}">${d.slice(4,6)}/${d.slice(6,8)}</text>`;
+  }).join('');
+  const markerPos = Math.min(cur/40*100, 100);
+  document.getElementById('breadthWrap').innerHTML = `
+  <div class="card">
+    <div class="mkt-head">
+      <span class="mkt-name">斷頭壓力儀表</span>
+      <span class="mkt-code">融資風險指標跌破 130% 之家數比例｜位階基準：2015/5 制度後歷史</span>
+    </div>
+    <div class="bd-grid">
+      <div class="bd-left">
+        <div class="bd-big s-${zcls==='good'?'':zcls}">${cur.toFixed(1)}<span class="unit">%</span><span class="bd-cnt">${nDang.toLocaleString()} / ${nCred.toLocaleString()} 檔</span>${dchip}</div>
+        <div class="bd-row">歷史位階：高於制度後 <b>${pr.toFixed(1)}%</b> 的交易日｜近5日 <b>${d5>=0?'+':''}${d5.toFixed(1)}pp</b></div>
+        <div class="zone-badge ${zcls}${blink}">⚠ ${zone}</div>
+        <div class="bd-row">${reversal
+          ? '<span style="color:var(--good);font-weight:700">✓ 反轉候選成立</span>（本波峰值 '+wavePeak.toFixed(1)+'%，已回落 '+pullback.toFixed(1)+'pp 且大盤5日轉正）'
+          : '反轉確認：<b>未成立</b>（本波峰值 '+wavePeak.toFixed(1)+'%，需自峰值回落 ≥5pp 且大盤近5日轉正'+(idx5!=null?'；大盤5日 '+(idx5>=0?'+':'')+idx5.toFixed(1)+'%':'')+'）'}</div>
+        <div class="gauge-lab" style="margin-top:14px"><span>0</span><span>10 壓力</span><span>20 危機</span><span>30 極端</span><span>40+</span></div>
+        <div class="gauge"><div class="g1"></div><div class="g2"></div><div class="g3"></div><div class="g4"></div><div class="gm" style="left:${markerPos}%"></div></div>
+      </div>
+      <div class="bd-spark">
+        <svg viewBox="0 0 ${W} ${H}">
+          ${ticks}
+          <path d="${path}" fill="none" stroke="#e6edf3" stroke-width="1.6"/>
+          <circle cx="${xs(nl).toFixed(1)}" cy="${yy(cur).toFixed(1)}" r="3" fill="${zcls==='danger'?'var(--danger)':(zcls==='warn'?'var(--warn)':'#e6edf3')}"/>
+          ${xdates}
+        </svg>
+      </div>
+    </div>
+  </div>`;
+})();
 
 /* ── 走勢 × 融資風險指標 疊圖（上下雙格共用時間軸） ── */
 const TREND = {};
