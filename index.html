@@ -120,6 +120,9 @@ footer b{color:var(--ink2)}
 .zone-badge.danger{background:var(--danger-bg);color:var(--danger)}
 .zone-badge.warn{background:var(--warn-bg);color:var(--warn)}
 .zone-badge.good{background:rgba(63,178,127,.12);color:var(--good)}
+.mc-type{font-weight:700}
+.mc-type.full{color:var(--warn)}
+.mc-type.part{color:var(--danger)}
 .gauge{position:relative;display:flex;height:10px;border-radius:5px;overflow:visible;margin:16px 0 4px}
 .gauge div{height:100%}
 .gauge .g1{background:#2e4a3c;width:25%;border-radius:5px 0 0 5px}
@@ -310,6 +313,19 @@ document.getElementById('alertBar').innerHTML = `
   else if(cur >= 10){ zone='壓力升高'; zcls='warn'; }
   else { zone='低壓'; zcls='good'; }
   const reversal = wave20 && pullback >= 5 && idx5 != null && idx5 > 0;
+  // 全面／局部斷頭判定（依聯合回測：破線高漲時看上市加權維持率是否同步跌破）
+  let typeHtml = '';
+  if(cur >= 20 && D.market && D.market.TSE && D.market.TSE.finRatio != null){
+    const tw = D.market.TSE.finRatio;
+    if(tw < 140){
+      const deep = tw < 135;
+      typeHtml = `<div class="bd-row">斷頭型態：<span class="mc-type full">全面性${deep?'・深度':''}</span>`
+        + `（上市大盤加權 ${tw.toFixed(1)}% 已破 ${deep?'135':'140'}）｜歷史上大盤同步破線的組合較接近跌勢尾聲</div>`;
+    } else {
+      typeHtml = `<div class="bd-row">斷頭型態：<span class="mc-type part">局部性・集中中小型股</span>`
+        + `（上市大盤加權 ${tw.toFixed(1)}% 仍在 140 以上）｜歷史上大盤未同步破線的組合，跌勢常未結束</div>`;
+    }
+  }
   const dchip = d1 > 0 ? `<span class="diff bad" style="margin-left:10px">▲ 較昨日 +${d1.toFixed(1)}pp（惡化）</span>`
              : d1 < 0 ? `<span class="diff good" style="margin-left:10px">▼ 較昨日 ${d1.toFixed(1)}pp（改善）</span>`
              : `<span class="diff flat" style="margin-left:10px">— 與昨日持平</span>`;
@@ -341,6 +357,7 @@ document.getElementById('alertBar').innerHTML = `
         <div class="bd-big s-${zcls==='good'?'':zcls}">${cur.toFixed(1)}<span class="unit">%</span><span class="bd-cnt">${nDang.toLocaleString()} / ${nCred.toLocaleString()} 檔</span>${dchip}</div>
         <div class="bd-row">歷史位階：高於制度後 <b>${pr.toFixed(1)}%</b> 的交易日｜近5日 <b>${d5>=0?'+':''}${d5.toFixed(1)}pp</b></div>
         <div class="zone-badge ${zcls}${blink}">⚠ ${zone}</div>
+        ${typeHtml}
         <div class="bd-row">${reversal
           ? '<span style="color:var(--good);font-weight:700">✓ 反轉候選成立</span>（本波峰值 '+wavePeak.toFixed(1)+'%，已回落 '+pullback.toFixed(1)+'pp 且大盤5日轉正）'
           : '反轉確認：<b>未成立</b>（本波峰值 '+wavePeak.toFixed(1)+'%，需自峰值回落 ≥5pp 且大盤近5日轉正'+(idx5!=null?'；大盤5日 '+(idx5>=0?'+':'')+idx5.toFixed(1)+'%':'')+'）'}</div>
