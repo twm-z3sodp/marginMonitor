@@ -313,7 +313,7 @@ document.getElementById('alertBar').innerHTML = `
   else if(cur >= 10){ zone='壓力升高'; zcls='warn'; }
   else { zone='低壓'; zcls='good'; }
   const reversal = wave20 && pullback >= 5 && idx5 != null && idx5 > 0;
-  // 全面／局部斷頭判定（依聯合回測：破線高漲時看上市加權維持率是否同步跌破）
+  // 全面／局部斷頭判定（依聯合回測：破線高漲時看上市大盤加權指標是否同步跌破）
   let typeHtml = '';
   if(cur >= 20 && D.market && D.market.TSE && D.market.TSE.finRatio != null){
     const tw = D.market.TSE.finRatio;
