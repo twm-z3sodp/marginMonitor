@@ -291,8 +291,10 @@ document.getElementById('alertBar').innerHTML = `
   const cur = s[nl].pct, prev = s[nl-1].pct;
   const d1 = cur - prev;
   const d5 = cur - (s[Math.max(0, nl-5)].pct);
-  const nDang = D.stocks.filter(x=>x.finRatio!=null && x.finRatio<130).length;
-  const nCred = D.stocks.filter(x=>x.finRatio!=null).length;
+  // 檔數與百分比共用 breadth.js 同一口徑（DB 直算、排除 91 開頭 DR）；舊檔無計數時才退回以表格資料估算
+  const lastPt = s[nl];
+  const nDang = lastPt.n!=null ? lastPt.n : D.stocks.filter(x=>x.finRatio!=null && x.finRatio<130).length;
+  const nCred = lastPt.c!=null ? lastPt.c : D.stocks.filter(x=>x.finRatio!=null).length;
   // 制度後歷史百分位（格點內插，B.ref = p0,p5,...,p100）
   const g = B.ref;
   let pr = 100;
