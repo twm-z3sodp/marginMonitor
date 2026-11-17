@@ -167,7 +167,7 @@ footer b{color:var(--ink2)}
     <h1>台股融資融券風險指標監控</h1>
     <span class="date-chip" id="dataDate"></span>
   </header>
-  <div class="sub">每日盤後信用交易資料｜追繳警戒線 130%</div>
+  <div class="sub">盤中定時推估 09:10・10:00・11:00・12:00・13:20｜盤後更新基準｜追繳警戒線 130%</div>
 
   <div class="cards" id="cards"></div>
   <div id="breadthWrap"></div>
@@ -213,9 +213,9 @@ footer b{color:var(--ink2)}
   <div class="count-note" id="countNote"></div>
 
   <footer>
-    <b>資料說明</b>：融資／融券／整體三項風險指標為每日盤後依信用交易資料推估計算；
+    <b>資料說明</b>：盤中以永豐報價及最近完整盤後的資券成本、餘額推估三項風險指標，資券增減仍屬基準日資料；盤後資料完整後切換新基準。
     加權指數／OTC 指數卡片為上市、上櫃全市場大盤合計值。
-    收盤價、漲跌、市值、資券餘額與券資比由資料庫同日資料補充。<br>
+    盤中股價、漲跌及市值估值隨定時快照更新；無有效報價者不沿用舊價。走勢最後一點在盤中為推估值。<br>
     <b>注意</b>：風險指標為推估口徑（依公告成數與推估成本計算），與券商實際帳戶數值、交易所公告之實戶口徑會有差異。
     數值僅供研究參考，非投資建議。
   </footer>
@@ -225,9 +225,38 @@ footer b{color:var(--ink2)}
 document.write('<script src="data.js?v=' + Date.now() + '"><\/script>');
 document.write('<script src="history.js?v=' + Date.now() + '"><\/script>');
 document.write('<script src="breadth.js?v=' + Date.now() + '"><\/script>');
+document.write('<script src="intraday.js?v=' + Date.now() + '"><\/script>');
 </script>
 <script>
-const D = window.MARGIN_DATA;
+let D = window.MARGIN_DATA;
+const L = window.MARGIN_INTRADAY;
+const isLive = !!(L && L.mode==='intraday_estimate' && L.baseDate===D.date && L.date>D.date);
+if(isLive){
+  D = L;
+  const H = window.MARGIN_HISTORY;
+  if(H && H.series){
+    for(const key of ['TSE','OTC']){
+      const m=D.market[key], series=H.series[key];
+      if(series && m.index!=null && m.finRatio!=null){
+        H.series[key]=[...series.filter(p=>p.d<D.date),{d:D.date,close:m.index,fin:m.finRatio}].slice(-60);
+      }
+    }
+  }
+  const B=window.BREADTH_DATA, b=D.intradayBreadth;
+  if(B && b && b.c>0 && b.c/b.total>=0.9){
+    B.series=[...B.series.filter(p=>p.d<D.date),{d:D.date,pct:b.pct,n:b.n,c:b.c}].slice(-180);
+  }
+}
+// Poll only a small publication receipt; quotes are sampled by the scheduled service.
+setInterval(async()=>{
+  try{
+    const response=await fetch('status.json?v='+Date.now(),{cache:'no-store'});
+    if(!response.ok) return;
+    const status=await response.json();
+    if(status.dataGenerated!==window.MARGIN_DATA.generated ||
+       status.intradayQuoteTime!==(L ? L.quoteTime : null)) location.reload();
+  }catch(_){}
+},60000);
 const TH_DANGER = 130, TH_WARN = 140;
 
 function cls(v){ if(v==null) return ''; if(v<TH_DANGER) return 'danger'; if(v<TH_WARN) return 'warn'; return 'good'; }
@@ -235,8 +264,23 @@ function fmtDate(s){ return s.slice(0,4)+'/'+s.slice(4,6)+'/'+s.slice(6,8); }
 function fmt(n,d=1){ return n==null ? '–' : n.toLocaleString('zh-TW',{minimumFractionDigits:d,maximumFractionDigits:d}); }
 function fmtInt(n){ return n==null ? '–' : n.toLocaleString('zh-TW'); }
 
-document.getElementById('dataDate').textContent = '資料日期 ' + fmtDate(D.date)
-  + (D.generated ? '｜' + D.generated.slice(11,16) + ' 更新' : '');
+document.getElementById('dataDate').textContent = isLive
+  ? '盤中推估｜報價擷取 '+D.quoteTime.slice(0,19).replace('T',' ')+'｜資券基準 '+fmtDate(D.baseDate)
+  : '盤後資料｜基準 '+fmtDate(D.date)+(D.generated?'｜'+D.generated.slice(11,16)+' 更新':'');
+const todayTaipei=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()).replaceAll('-','');
+if(isLive){
+  const notice=document.createElement('div');
+  notice.className='alert-chip'; notice.style.marginBottom='14px';
+  notice.textContent=(D.date<todayTaipei?'此為前一交易日盤中快照，並非今日報價。':'')
+    +'盤中推估：今日資券增減尚未知；有效報價 '+D.coverage.quoted+' / '+D.coverage.total
+    +' 檔。擷取失效、跨日、尚無成交或價格基準異動者不試算；各股本日最後成交時間列於名稱下方。';
+  document.getElementById('cards').before(notice);
+  document.querySelector('th[data-k="close"]').textContent='現價';
+  for(const k of ['finBal','finChg','sr']){
+    const th=document.querySelector('th[data-k="'+k+'"]');
+    if(th) th.title='最近完整盤後資料，基準日 '+fmtDate(D.baseDate);
+  }
+}
 
 /* ── market cards ── */
 const MKT_META = { TSE:{name:'加權指數', tag:'上市'}, OTC:{name:'OTC 櫃買指數', tag:'上櫃'} };
@@ -268,10 +312,10 @@ for(const key of ['TSE','OTC']){
     <div class="card">
       <div class="mkt-head">
         <span class="mkt-name">${meta.name}</span><span class="mkt-code">${meta.tag}</span>
-        <span class="idx">${fmt(m.index,2)}<span class="chg ${chgCls}">${m.indexChg>0?'▲':(m.indexChg<0?'▼':'')} ${fmt(Math.abs(m.indexChg),2)}</span></span>
+        <span class="idx">${isLive && m.index==null?'暫無指數報價':fmt(m.index,2)}<span class="chg ${chgCls}">${m.indexChg>0?'▲':(m.indexChg<0?'▼':'')} ${fmt(Math.abs(m.indexChg),2)}</span></span>
       </div>
       <div class="ratio-row">${ratios}</div>
-      <div class="meta"><span>信用交易檔數 ${m.n.toLocaleString()}</span>${m.finBalValue?`<span>融資餘額約 ${fmtInt(m.finBalValue)} 億</span>`:''}</div>
+      <div class="meta"><span>信用交易檔數 ${m.n.toLocaleString()}</span>${m.finBalValue?`<span>融資餘額約 ${fmtInt(m.finBalValue)} 億</span>`:''}${isLive?`<span>報價覆蓋 ${m.quoted} / ${m.quoteTotal}（${m.coverage}%）｜融資金額覆蓋 ${m.exposureCoverage}%｜${m.quoteStatus}</span>`:''}</div>
     </div>`);
 }
 
@@ -286,6 +330,10 @@ document.getElementById('alertBar').innerHTML = `
 /* ── 斷頭壓力儀表（破線比例＋所在位階） ── */
 (function(){
   const B = window.BREADTH_DATA;
+  if(isLive && (!D.intradayBreadth.c || D.intradayBreadth.c/D.intradayBreadth.total<0.9)){
+    document.getElementById('breadthWrap').innerHTML='<div class="card">盤中推估報價覆蓋不足，暫不計算壓力比例。盤後走勢保留作參考。</div>';
+    return;
+  }
   if(!B || !B.series || B.series.length < 10) return;
   const s = B.series, nl = s.length - 1;
   const cur = s[nl].pct, prev = s[nl-1].pct;
@@ -354,7 +402,7 @@ document.getElementById('alertBar').innerHTML = `
   <div class="card">
     <div class="mkt-head">
       <span class="mkt-name">斷頭壓力儀表</span>
-      <span class="mkt-code">融資風險指標跌破 130% 之家數比例｜位階基準：2015/5 制度後歷史</span>
+      <span class="mkt-code">融資風險指標跌破 130% 之家數比例${isLive?'（已報價樣本・盤中推估）':''}｜位階基準：2015/5 制度後歷史</span>
     </div>
     <div class="bd-grid">
       <div class="bd-left">
@@ -521,7 +569,7 @@ function render(){
     const chgCls = s.chg>0?'chg-up':(s.chg<0?'chg-down':'chg-flat');
     return `<tr>
       <td class="l dim">${i+1}</td>
-      <td class="l"><span class="nm">${s.name}</span><span class="code">${s.id}</span><span class="mtag">${s.mkt}</span></td>
+      <td class="l"><span class="nm">${s.name}</span><span class="code">${s.id}</span><span class="mtag">${s.mkt}</span>${isLive?`<div class="dim" style="font-size:11px">${s.quoteTime?'最後成交 '+s.quoteTime.slice(11,19)+(s.quoteLagSeconds>300?'（近5分鐘無新成交）':''):s.quoteStatus}</div>`:''}</td>
       <td>${fmt(s.close,2)}</td>
       <td class="${chgCls}">${s.chg==null?'–':(s.chg>0?'+':'')+fmt(s.chg,2)}</td>
       <td class="hide-m cap-col">${fmt(s.cap,0)}</td>
