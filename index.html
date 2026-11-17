@@ -343,7 +343,8 @@ document.getElementById('alertBar').innerHTML = `
   <div class="alert-chip warn">130–140% 接近追繳：<b>${nWarn}</b> 檔</div>
   <div class="alert-chip">有信用交易餘額個股：<b>${D.stocks.length.toLocaleString()}</b> 檔</div>`;
 
-// Each continuous >=20% interval is one high-pressure episode. Keep every tied peak date.
+// Keep the latest two waves reaching 20%, using the existing reset below 10%.
+// P1 is the higher peak; L1 is the lower financing-risk trough.
 function pressurePeaks(series, threshold=20){
   const episodes=[];
   let active=null;
@@ -353,10 +354,11 @@ function pressurePeaks(series, threshold=20){
       active.end=point.d;
       if(point.pct>active.peak){ active.peak=point.pct; active.points=[]; }
       if(point.pct===active.peak) active.points.push({...point,index});
-    }else if(active){ episodes.push(active); active=null; }
+    }else if(active && point.pct<10){ episodes.push(active); active=null; }
   });
   if(active){ active.ongoing=true; episodes.push(active); }
-  return episodes.map((episode,index)=>({...episode,id:'P'+(index+1)}));
+  return episodes.slice(-2).sort((a,b)=>b.peak-a.peak || b.points[0].d.localeCompare(a.points[0].d))
+    .map((episode,index)=>({...episode,id:'P'+(index+1)}));
 }
 
 function pressureLows(series, threshold=140){
@@ -373,7 +375,8 @@ function pressureLows(series, threshold=140){
     }
   });
   if(active){ active.ongoing=true; episodes.push(active); }
-  return episodes.map((episode,index)=>({...episode,id:'L'+(index+1)}));
+  return episodes.slice(-2).sort((a,b)=>a.low-b.low || b.points[0].d.localeCompare(a.points[0].d))
+    .map((episode,index)=>({...episode,id:'L'+(index+1)}));
 }
 
 /* ── 斷頭壓力儀表（破線比例＋所在位階） ── */
@@ -468,10 +471,10 @@ function pressureLows(series, threshold=140){
     const kind=isLive && point.d===D.date?'盤中推估 '+D.quoteTime.slice(11,19):'盤後';
     return `<tr><td class="peak-id">${episode.id}</td><td>${fmtDate(point.d)}<span class="dim">（${kind}）</span></td>
       <td><b>${point.pct.toFixed(2)}%</b></td><td>${point.n!=null&&point.c!=null?point.n.toLocaleString()+' / '+point.c.toLocaleString():'–'}</td>
-      <td>${delta>0?'+':''}${delta.toFixed(2)}pp</td><td>${episode.ongoing?'本段仍在高位區':'已離開高位區'}</td></tr>`;
+      <td>${delta>0?'+':''}${delta.toFixed(2)}pp</td><td>${episode.ongoing?'本波尚未回落10%以下':'該波已結束'}</td></tr>`;
   })).join('');
   const peakCompare=peaks.length?`<div class="peak-compare">
-    <b>高位日期對照</b><div class="peak-note">共同期間 ${fmtDate(s[0].d)}～${fmtDate(s[nl].d)}（${s.length} 個交易日）。每段連續 ≥20% 的最高點皆列出；相同高點的日期全部保留。<br>
+    <b>近期兩波高位日期對照</b><div class="peak-note">共同期間 ${fmtDate(s[0].d)}～${fmtDate(s[nl].d)}（${s.length} 個交易日）。僅列近期兩波達20%以上的主要高峰；回落10%以下才分新波，P1 為較高峰，同高日期保留。<br>
     最新對照：${currentDate}（${currentKind}）${cur.toFixed(2)}%；差距＝最新比例－該高位比例。</div>
     <div class="peak-scroll"><table class="peak-table"><thead><tr><th>圖示</th><th>高位日期</th><th>峰值比例</th><th>當時破線／融資檔數</th><th>最新較高位</th><th>狀態</th></tr></thead><tbody>${peakRows}</tbody></table></div>
     </div>`:'<div class="peak-note">目前圖示期間沒有 ≥20% 的高位區段。</div>';
@@ -583,8 +586,8 @@ function buildTrendCard(key, s){
       <td><b>${point.fin.toFixed(2)}%</b></td><td>${fmt(point.close,2)}</td>
       <td>${delta==null?'–':(delta>0?'+':'')+delta.toFixed(2)+'pp'}</td><td>${episode.gap?'資料中斷':episode.ongoing?'本段仍低於140%':'已回到140%以上'}</td></tr>`;
   })).join('');
-  const lowCompare=lows.length?`<div class="peak-compare"><b>低位日期對照</b>
-    <div class="peak-note">共同期間 ${fmtDate(s[0].d)}～${fmtDate(latest.d)}（${n} 個交易日）。每段連續低於140%的最低點皆列出，同低日期全部保留。<br>
+  const lowCompare=lows.length?`<div class="peak-compare"><b>近期兩個低位日期對照</b>
+    <div class="peak-note">共同期間 ${fmtDate(s[0].d)}～${fmtDate(latest.d)}（${n} 個交易日）。僅列近期兩段低於140%的谷底，L1 為較低點（融資風險指標越低越危險），同低日期保留。<br>
     最新對照 ${fmtDate(latest.d)}：${Number.isFinite(latest.fin)?latest.fin.toFixed(2)+'%':'資料不足'}${isLive?'（盤中推估）':'（盤後）'}；差距＝最新比例－該低位比例。</div>
     <div class="peak-scroll"><table class="peak-table"><thead><tr><th>圖示</th><th>低位日期</th><th>融資風險指標</th><th>同日指數</th><th>最新較低位</th><th>狀態</th></tr></thead><tbody>${lowRows}</tbody></table></div></div>`
     :'<div class="peak-note">共同期間沒有低於140%的區段。</div>';
