@@ -473,6 +473,8 @@ function pressureLows(series, threshold=140){
       <td><b>${point.pct.toFixed(2)}%</b></td><td>${point.n!=null&&point.c!=null?point.n.toLocaleString()+' / '+point.c.toLocaleString():'–'}</td>
       <td>${delta>0?'+':''}${delta.toFixed(2)}pp</td><td>${episode.ongoing?'本波尚未回落10%以下':'該波已結束'}</td></tr>`;
   })).join('');
+  const july=s.find(p=>p.d==='20260730') || window.BREADTH_DATA.reference;
+  const julyCompare=july?`<div class="peak-compare"><b>七月大跌日・固定對照</b><div class="peak-note">${fmtDate(july.d)}（盤後）｜破線比例 <b>${july.pct.toFixed(2)}%</b>｜${july.n.toLocaleString()} / ${july.c.toLocaleString()} 檔｜最新較當日 ${(cur-july.pct)>0?'+':''}${(cur-july.pct).toFixed(2)}pp</div></div>`:'';
   const peakCompare=peaks.length?`<div class="peak-compare">
     <b>近期兩波高位日期對照</b><div class="peak-note">共同期間 ${fmtDate(s[0].d)}～${fmtDate(s[nl].d)}（${s.length} 個交易日）。僅列近期兩波達20%以上的主要高峰；回落10%以下才分新波，P1 為較高峰，同高日期保留。<br>
     最新對照：${currentDate}（${currentKind}）${cur.toFixed(2)}%；差距＝最新比例－該高位比例。</div>
@@ -508,7 +510,7 @@ function pressureLows(series, threshold=140){
         </svg>
       </div>
     </div>
-    ${peakCompare}
+    ${julyCompare}${peakCompare}
   </div>`;
 })();
 
@@ -586,6 +588,9 @@ function buildTrendCard(key, s){
       <td><b>${point.fin.toFixed(2)}%</b></td><td>${fmt(point.close,2)}</td>
       <td>${delta==null?'–':(delta>0?'+':'')+delta.toFixed(2)+'pp'}</td><td>${episode.gap?'資料中斷':episode.ongoing?'本段仍低於140%':'已回到140%以上'}</td></tr>`;
   })).join('');
+  const july=s.find(p=>p.d==='20260730') || window.MARGIN_HISTORY.reference?.[key];
+  const julyDelta=july && Number.isFinite(latest.fin)?latest.fin-july.fin:null;
+  const julyCompare=july?`<div class="peak-compare"><b>七月大跌日・固定對照</b><div class="peak-note">${fmtDate(july.d)}（盤後）｜融資風險指標 <b>${july.fin.toFixed(2)}%</b>｜同日指數 ${fmt(july.close,2)}｜最新較當日 ${julyDelta==null?'–':(julyDelta>0?'+':'')+julyDelta.toFixed(2)+'pp'}</div></div>`:'';
   const lowCompare=lows.length?`<div class="peak-compare"><b>近期兩個低位日期對照</b>
     <div class="peak-note">共同期間 ${fmtDate(s[0].d)}～${fmtDate(latest.d)}（${n} 個交易日）。僅列近期兩段低於140%的谷底，L1 為較低點（融資風險指標越低越危險），同低日期保留。<br>
     最新對照 ${fmtDate(latest.d)}：${Number.isFinite(latest.fin)?latest.fin.toFixed(2)+'%':'資料不足'}${isLive?'（盤中推估）':'（盤後）'}；差距＝最新比例－該低位比例。</div>
@@ -614,7 +619,7 @@ function buildTrendCard(key, s){
       </svg>
       <div class="tt" id="tt-${key}"></div>
     </div>
-    ${lowCompare}
+    ${julyCompare}${lowCompare}
   </div>`;
 }
 
