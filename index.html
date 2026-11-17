@@ -589,6 +589,13 @@ function buildTrendCard(key, s){
       <td>${delta==null?'–':(delta>0?'+':'')+delta.toFixed(2)+'pp'}</td><td>${episode.gap?'資料中斷':episode.ongoing?'本段仍低於140%':'已回到140%以上'}</td></tr>`;
   })).join('');
   const july=s.find(p=>p.d==='20260730') || window.MARGIN_HISTORY.reference?.[key];
+  const julyIndex=s.findIndex(p=>p.d==='20260730');
+  const julyMark=julyIndex>=0 && Number.isFinite(july.fin)?(()=>{
+    const x=xs(julyIndex), y=yF(july.fin), ly=p2y-38;
+    return `<g class="july-fixed-marker"><line x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${ly+5}" y2="${(y-5).toFixed(1)}" stroke="#65d6ce" stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="${x.toFixed(1)}" y="${ly}" fill="#65d6ce" font-size="11" font-weight="700" text-anchor="middle">固定 07/30 ${july.fin.toFixed(2)}%</text>
+      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="#161c24" stroke="#65d6ce" stroke-width="2"><title>七月大跌日｜${fmtDate(july.d)}｜${july.fin.toFixed(2)}%</title></circle></g>`;
+  })():'';
   const julyDelta=july && Number.isFinite(latest.fin)?latest.fin-july.fin:null;
   const julyCompare=july?`<div class="peak-compare"><b>七月大跌日・固定對照</b><div class="peak-note">${fmtDate(july.d)}（盤後）｜融資風險指標 <b>${july.fin.toFixed(2)}%</b>｜同日指數 ${fmt(july.close,2)}｜最新較當日 ${julyDelta==null?'–':(julyDelta>0?'+':'')+julyDelta.toFixed(2)+'pp'}</div></div>`:'';
   const lowCompare=lows.length?`<div class="peak-compare"><b>近期兩個低位日期對照</b>
@@ -610,7 +617,7 @@ function buildTrendCard(key, s){
         <text x="${PL}" y="${p2y-8}" class="ptitle">融資風險指標(%)</text>
         <path d="${path(yC,cl)}" fill="none" stroke="var(--accent)" stroke-width="2"/>
         <path d="${path(yF,fn)}" fill="none" stroke="#e6edf3" stroke-width="2"/>
-        ${lowMarks}
+        ${lowMarks}${julyMark}
         ${Number.isFinite(cl[n-1])?`<circle cx="${xs(n-1).toFixed(1)}" cy="${yC(cl[n-1]).toFixed(1)}" r="3" fill="var(--accent)"/>`:''}
         ${Number.isFinite(fn[n-1])?`<circle cx="${xs(n-1).toFixed(1)}" cy="${yF(fn[n-1]).toFixed(1)}" r="3" fill="#e6edf3"/>`:''}
         <line id="ch-${key}" x1="0" x2="0" y1="${PT}" y2="${p2y+PH2}" stroke="var(--accent)" stroke-width="1" opacity="0" stroke-dasharray="2 3"/>
