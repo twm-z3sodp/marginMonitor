@@ -244,8 +244,8 @@ if(isLive){
   if(H && H.series){
     for(const key of ['TSE','OTC']){
       const m=D.market[key], series=H.series[key];
-      if(series && m.index!=null && m.finRatio!=null){
-        H.series[key]=[...series.filter(p=>p.d<D.date),{d:D.date,close:m.index,fin:m.finRatio}].slice(-180);
+      if(series){
+        H.series[key]=[...series.filter(p=>p.d<D.date),{d:D.date,close:m.index??null,fin:m.finRatio??null}].slice(-180);
       }
     }
   }
@@ -256,7 +256,7 @@ if(isLive){
 }
 // Use the pressure chart's exact trading dates for both market charts. Missing
 // points remain explicit gaps; never shorten one chart or invent a price.
-const chartDates=(window.BREADTH_DATA?.series || []).map(p=>p.d);
+const chartDates=[...new Set([...(window.BREADTH_DATA?.series || []).map(p=>p.d),...(isLive?[D.date]:[])])].sort().slice(-180);
 if(window.MARGIN_HISTORY?.series && chartDates.length){
   for(const key of ['TSE','OTC']){
     const byDate=new Map((window.MARGIN_HISTORY.series[key] || []).map(p=>[p.d,p]));
@@ -600,7 +600,7 @@ function buildTrendCard(key, s){
   const julyCompare=july?`<div class="peak-compare"><b>七月大跌日・固定對照</b><div class="peak-note">${fmtDate(july.d)}（盤後）｜融資風險指標 <b>${july.fin.toFixed(2)}%</b>｜同日指數 ${fmt(july.close,2)}｜最新較當日 ${julyDelta==null?'–':(julyDelta>0?'+':'')+julyDelta.toFixed(2)+'pp'}</div></div>`:'';
   const lowCompare=lows.length?`<div class="peak-compare"><b>近期兩個低位日期對照</b>
     <div class="peak-note">共同期間 ${fmtDate(s[0].d)}～${fmtDate(latest.d)}（${n} 個交易日）。僅列近期兩段低於140%的谷底，L1 為較低點（融資風險指標越低越危險），同低日期保留。<br>
-    最新對照 ${fmtDate(latest.d)}：${Number.isFinite(latest.fin)?latest.fin.toFixed(2)+'%':'資料不足'}${isLive?'（盤中推估）':'（盤後）'}；差距＝最新比例－該低位比例。</div>
+    最新對照 ${fmtDate(latest.d)}：${Number.isFinite(latest.fin)?latest.fin.toFixed(2)+'%':'資料不足'}${isLive && latest.d===D.date?'（盤中推估）':'（盤後）'}；差距＝最新比例－該低位比例。</div>
     <div class="peak-scroll"><table class="peak-table"><thead><tr><th>圖示</th><th>低位日期</th><th>融資風險指標</th><th>同日指數</th><th>最新較低位</th><th>狀態</th></tr></thead><tbody>${lowRows}</tbody></table></div></div>`
     :'<div class="peak-note">共同期間沒有低於140%的區段。</div>';
   TREND[key]={s, PL, PR, W, n};
