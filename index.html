@@ -239,6 +239,7 @@ document.write('<script src="intraday.js?v=' + Date.now() + '"><\/script>');
 let D = window.MARGIN_DATA;
 const L = window.MARGIN_INTRADAY;
 const isLive = !!(L && L.mode==='intraday_estimate' && L.baseDate===D.date && L.date>D.date);
+const liveLabel=L?.captureKind==='closing_estimate'?'收盤估算':'盤中推估';
 if(isLive){
   D = L;
   const H = window.MARGIN_HISTORY;
@@ -282,17 +283,17 @@ function fmt(n,d=1){ return n==null ? '–' : n.toLocaleString('zh-TW',{minimumF
 function fmtInt(n){ return n==null ? '–' : n.toLocaleString('zh-TW'); }
 
 document.getElementById('dataDate').textContent = isLive
-  ? '盤中推估｜報價擷取 '+D.quoteTime.slice(0,19).replace('T',' ')+'｜資券基準 '+fmtDate(D.baseDate)
+  ? liveLabel+'｜報價擷取 '+D.quoteTime.slice(0,19).replace('T',' ')+'｜資券基準 '+fmtDate(D.baseDate)
   : '盤後資料｜基準 '+fmtDate(D.date)+(D.generated?'｜'+D.generated.slice(11,16)+' 更新':'');
 const todayTaipei=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()).replaceAll('-','');
 if(isLive){
   const notice=document.createElement('div');
   notice.className='alert-chip'; notice.style.marginBottom='14px';
-  notice.textContent=(D.date<todayTaipei?'此為前一交易日盤中快照，並非今日報價。':'')
-    +'盤中推估：今日資券增減尚未知；有效報價 '+D.coverage.quoted+' / '+D.coverage.total
+  notice.textContent=(D.date<todayTaipei?'此為前一交易日快照。':'')
+    +liveLabel+'：當日資券增減尚未知；有效報價 '+D.coverage.quoted+' / '+D.coverage.total
     +' 檔。擷取失效、跨日、尚無成交或價格基準異動者不試算；各股本日最後成交時間列於名稱下方。';
   document.getElementById('cards').before(notice);
-  document.querySelector('th[data-k="close"]').textContent='現價';
+  document.querySelector('th[data-k="close"]').textContent=L.captureKind==='closing_estimate'?'最近成交價':'現價';
   for(const k of ['finBal','finChg','sr']){
     const th=document.querySelector('th[data-k="'+k+'"]');
     if(th) th.title='最近完整盤後資料，基準日 '+fmtDate(D.baseDate);
@@ -384,7 +385,7 @@ function pressureLows(series, threshold=140){
 (function(){
   const B = window.BREADTH_DATA;
   if(isLive && (!D.intradayBreadth.c || D.intradayBreadth.c/D.intradayBreadth.total<0.9)){
-    document.getElementById('breadthWrap').innerHTML='<div class="card">盤中推估報價覆蓋不足，暫不計算壓力比例。盤後走勢保留作參考。</div>';
+    document.getElementById('breadthWrap').innerHTML='<div class="card">'+liveLabel+'報價覆蓋不足，暫不計算壓力比例。盤後走勢保留作參考。</div>';
     return;
   }
   if(!B || !B.series || B.series.length < 10) return;
@@ -466,10 +467,10 @@ function pressureLows(series, threshold=140){
       <text x="${labelX.toFixed(1)}" y="${labelY}" fill="#e8a33d" font-size="10" text-anchor="middle">${episode.id} ${point.d.slice(4,6)}/${point.d.slice(6,8)} ${episode.peak.toFixed(1)}%</text>${points}`;
   }).join('');
   const currentDate=fmtDate(s[nl].d);
-  const currentKind=isLive?'盤中推估 '+D.quoteTime.slice(11,19):'盤後';
+  const currentKind=isLive?liveLabel+' '+D.quoteTime.slice(11,19):'盤後';
   const peakRows=peaks.flatMap(episode=>episode.points.map(point=>{
     const delta=cur-point.pct;
-    const kind=isLive && point.d===D.date?'盤中推估 '+D.quoteTime.slice(11,19):'盤後';
+    const kind=isLive && point.d===D.date?liveLabel+' '+D.quoteTime.slice(11,19):'盤後';
     return `<tr><td class="peak-id">${episode.id}</td><td>${fmtDate(point.d)}<span class="dim">（${kind}）</span></td>
       <td><b>${point.pct.toFixed(2)}%</b></td><td>${point.n!=null&&point.c!=null?point.n.toLocaleString()+' / '+point.c.toLocaleString():'–'}</td>
       <td>${delta>0?'+':''}${delta.toFixed(2)}pp</td><td>${episode.ongoing?'本波尚未回落10%以下':'該波已結束'}</td></tr>`;
@@ -486,7 +487,7 @@ function pressureLows(series, threshold=140){
   <div class="card">
     <div class="mkt-head">
       <span class="mkt-name">斷頭壓力儀表</span>
-      <span class="mkt-code">融資風險指標跌破 130% 之家數比例${isLive?'（已報價樣本・盤中推估）':''}｜位階基準：2015/5 制度後歷史</span>
+      <span class="mkt-code">融資風險指標跌破 130% 之家數比例${isLive?'（已報價樣本・'+liveLabel+'）':''}｜位階基準：2015/5 制度後歷史</span>
     </div>
     <div class="bd-grid">
       <div class="bd-left">
@@ -584,7 +585,7 @@ function buildTrendCard(key, s){
   const latest=s[n-1];
   const lowRows=lows.flatMap(episode=>episode.points.map(point=>{
     const delta=Number.isFinite(latest.fin)?latest.fin-point.fin:null;
-    const kind=isLive && point.d===D.date?'盤中推估 '+D.quoteTime.slice(11,19):'盤後';
+    const kind=isLive && point.d===D.date?liveLabel+' '+D.quoteTime.slice(11,19):'盤後';
     return `<tr><td class="peak-id">${episode.id}</td><td>${fmtDate(point.d)}<span class="dim">（${kind}）</span></td>
       <td><b>${point.fin.toFixed(2)}%</b></td><td>${fmt(point.close,2)}</td>
       <td>${delta==null?'–':(delta>0?'+':'')+delta.toFixed(2)+'pp'}</td><td>${episode.gap?'資料中斷':episode.ongoing?'本段仍低於140%':'已回到140%以上'}</td></tr>`;
@@ -601,7 +602,7 @@ function buildTrendCard(key, s){
   const julyCompare=july?`<div class="peak-compare"><b>七月大跌日・固定對照</b><div class="peak-note">${fmtDate(july.d)}（盤後）｜融資風險指標 <b>${july.fin.toFixed(2)}%</b>｜同日指數 ${fmt(july.close,2)}｜最新較當日 ${julyDelta==null?'–':(julyDelta>0?'+':'')+julyDelta.toFixed(2)+'pp'}</div></div>`:'';
   const lowCompare=lows.length?`<div class="peak-compare"><b>近期兩個低位日期對照</b>
     <div class="peak-note">共同期間 ${fmtDate(s[0].d)}～${fmtDate(latest.d)}（${n} 個交易日）。僅列近期兩段低於140%的谷底，L1 為較低點（融資風險指標越低越危險），同低日期保留。<br>
-    最新對照 ${fmtDate(latest.d)}：${Number.isFinite(latest.fin)?latest.fin.toFixed(2)+'%':'資料不足'}${isLive && latest.d===D.date?'（盤中推估）':'（盤後）'}；差距＝最新比例－該低位比例。</div>
+    最新對照 ${fmtDate(latest.d)}：${Number.isFinite(latest.fin)?latest.fin.toFixed(2)+'%':'資料不足'}${isLive && latest.d===D.date?'（'+liveLabel+'）':'（盤後）'}；差距＝最新比例－該低位比例。</div>
     <div class="peak-scroll"><table class="peak-table"><thead><tr><th>圖示</th><th>低位日期</th><th>融資風險指標</th><th>同日指數</th><th>最新較低位</th><th>狀態</th></tr></thead><tbody>${lowRows}</tbody></table></div></div>`
     :'<div class="peak-note">共同期間沒有低於140%的區段。</div>';
   TREND[key]={s, PL, PR, W, n};
@@ -646,7 +647,7 @@ function hookTrend(key){
     ch.setAttribute('x1',x); ch.setAttribute('x2',x); ch.setAttribute('opacity','1');
     const c=cls(p.fin);
     const col=c==='danger'?'var(--danger)':(c==='warn'?'var(--warn)':'var(--ink)');
-    tt.innerHTML=`${fmtDate(p.d)}${isLive&&p.d===D.date?'（盤中推估）':''}<br>指數 <b>${fmt(p.close,2)}</b><br>融資風險指標 <b style="color:${col}">${fmt(p.fin,2)}${p.fin==null?'':'%'}</b>`;
+    tt.innerHTML=`${fmtDate(p.d)}${isLive&&p.d===D.date?'（'+liveLabel+'）':''}<br>指數 <b>${fmt(p.close,2)}</b><br>融資風險指標 <b style="color:${col}">${fmt(p.fin,2)}${p.fin==null?'':'%'}</b>`;
     tt.style.display='block';
     const bw=box.clientWidth, px=x/W*bw;
     tt.style.left=Math.min(px+12, bw-160)+'px';
